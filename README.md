@@ -1,6 +1,6 @@
 # LaTeX-to-Image Converter
 
-This tool allows you to easily convert LaTeX equations into images. You can then paste these images into applications like Word, OneNote, or PowerPoint. It's especially useful for converting complex formulas you get from AI like ChatGPT, Gemini, or others, into a usable format for your documents and presentations. The tool also allows you to convert LaTeX into plain text.
+This tool allows you to easily convert LaTeX equations into images. You can then paste these images into applications like Word, OneNote, or PowerPoint. It's especially useful for converting complex formulas you get from AI like ChatGPT, Gemini, or others, into a usable format for your documents and presentations. The tool also allows you to convert LaTeX into plain text and copy MathML/Office-ready markup directly for Equation editors.
 
 ![Screenshot 1](Screenshots/1.png)
 ![Screenshot 2](Screenshots/2.png)
@@ -32,10 +32,11 @@ If you don't have Python, you need to install it first.
     ```
 3.  Install the necessary Python libraries by running this command:
     ```cmd
-    pip install pillow matplotlib ttkthemes pywin32
+    pip install pillow matplotlib ttkthemes pywin32 latex2mathml
     ```
     *On non-Windows systems the `pywin32` dependency is optional and can be
-    omitted.*
+    omitted. The `latex2mathml` library enables the new "Copy for Word/OneNote"
+    button. If you do not need MathML clipboard support you may skip it.*
 
 ### Step 4: Run the Application
 
@@ -45,7 +46,18 @@ Now, you can run the tool. Simply double-click the `latexclip.py` file, or run i
 python latexclip.py
 ```
 
-The application window will open, and you can start converting your LaTeX!
+The application window will open, and you can start converting your LaTeX. Use the **Copy for Word/OneNote** button to place MathML/HTML markup on the clipboard that pastes directly into Office equation editors. A live plain-text preview shows you what the simplified version will look like for documentation.
+
+---
+
+## Tips for Complex Formulas
+
+The converter now understands alignment environments (`align`, `align*`, `gather`), structured pieces (`cases`), and matrix-style layouts when producing plain text. A few quick guidelines will help you get the best results:
+
+* Use LaTeX text macros such as `\text{...}` or `\mathrm{...}` around multi-word labels so that both the Office-friendly output and the plain-text preview preserve your spacing.
+* When building piecewise expressions, keep the standard `value , & condition` layout—LaTeX Clip rewrites this to human-friendly prose (for example `f(x) = (x^2 if x > 0; 0 otherwise)`).
+* For matrices or arrays, feel free to include `\hline` separators. They are ignored in the plain-text rendering while the MathML/HTML clipboard still carries the full structure for Office.
+* The preview collapses repeated whitespace automatically. If you need deliberate spacing in exported text, prefer explicit LaTeX spacing commands (`\,`, `\;`, `\quad`) or wrap the content in `\text{ }`.
 
 ---
 

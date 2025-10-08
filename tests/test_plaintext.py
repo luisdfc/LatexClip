@@ -82,7 +82,7 @@ def latexclip(monkeypatch: pytest.MonkeyPatch):
 
 def test_plaintext_preserves_nested_fractions(latexclip):
     result = latexclip.latex_to_plaintext(r"\frac{1+\frac{1}{x}}{y}")
-    assert result == r"\frac(1+(1)/(x))(y)"
+    assert result == "(1+(1)/(x))/(y)"
 
 
 def test_plaintext_handles_nested_sqrt(latexclip):
@@ -103,3 +103,74 @@ def test_sanitizer_escapes_plain_text_specials(latexclip):
 def test_sanitizer_retains_existing_escapes(latexclip):
     result = latexclip.sanitize_for_mathtext(r"Already escaped \% value")
     assert result == r"$Already escaped \% value$"
+
+
+def test_plaintext_maps_common_symbols(latexclip):
+    result = latexclip.latex_to_plaintext(r"\alpha \cdot \beta \leq \gamma")
+    assert result == "alpha · beta ≤ gamma"
+
+
+def test_plaintext_handles_binomials(latexclip):
+    result = latexclip.latex_to_plaintext(r"\binom{n}{k}")
+    assert result == "C(n, k)"
+
+
+def test_plaintext_handles_displaystyle_binomials(latexclip):
+    result = latexclip.latex_to_plaintext(r"\dbinom{\dfrac{n}{2}}{k}")
+    assert result == "C((n)/(2), k)"
+
+
+def test_plaintext_handles_displaystyle_fractions(latexclip):
+    result = latexclip.latex_to_plaintext(r"\dfrac{a}{\tfrac{b}{c}}")
+    assert result == "(a)/((b)/(c))"
+
+
+def test_plaintext_handles_ampersands_in_text(latexclip):
+    latex = r"$$NOI = \text{Gross Potential Income} - \text{Vacancy & Collection Losses} - \text{Operating Expenses}$$"
+    result = latexclip.latex_to_plaintext(latex)
+    assert (
+        result
+        == "NOI = Gross Potential Income - Vacancy & Collection Losses - Operating Expenses"
+    )
+
+
+def test_plaintext_renders_matrix_structure(latexclip):
+    latex = r"\begin{bmatrix} a & b \\ c & d \end{bmatrix}"
+    result = latexclip.latex_to_plaintext(latex)
+    assert result == "[a, b; c, d]"
+
+
+def test_sanitizer_preserves_spaces_inside_text(latexclip):
+    latex = r"$$NOI = \text{Operating Expenses}$$"
+    result = latexclip.sanitize_for_mathtext(latex)
+    assert result == r"$NOI = \mathrm{Operating\ Expenses}$"
+
+
+def test_sanitizer_escapes_ampersands_inside_text(latexclip):
+    latex = r"$$\text{Vacancy & Collection}$$"
+    result = latexclip.sanitize_for_mathtext(latex)
+    assert result == r"$\mathrm{Vacancy\ \&\ Collection}$"
+
+
+def test_plaintext_supports_cases_environments(latexclip):
+    latex = r"\begin{cases} x^2, & x > 0 \\ 0, & \text{otherwise} \end{cases}"
+    result = latexclip.latex_to_plaintext(latex)
+    assert result == "(x^2 if x > 0; 0 otherwise)"
+
+
+def test_plaintext_handles_align_star(latexclip):
+    latex = r"\begin{align*} a &= b + c \\ d &= e - f \end{align*}"
+    result = latexclip.latex_to_plaintext(latex)
+    assert result == "a = b + c; d = e - f"
+
+
+def test_plaintext_trims_hlines_in_arrays(latexclip):
+    latex = r"\begin{array}{cc} \hline a & b \\ \hline c & d \end{array}"
+    result = latexclip.latex_to_plaintext(latex)
+    assert result == "[a, b; c, d]"
+
+
+def test_plaintext_flattens_additional_text_macros(latexclip):
+    latex = r"\mathbf{Net}~\mathrm{Income}"
+    result = latexclip.latex_to_plaintext(latex)
+    assert result == "Net Income"
