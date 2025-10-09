@@ -1,6 +1,24 @@
 # LaTeX-to-Image Converter
 
-This tool allows you to easily convert LaTeX equations into images. You can then paste these images into applications like Word, OneNote, or PowerPoint. It's especially useful for converting complex formulas you get from AI like ChatGPT, Gemini, or others, into a usable format for your documents and presentations. The tool also allows you to convert LaTeX into plain text and copy MathML/Office-ready markup directly for Equation editors.
+LaTeX Clip is a desktop LaTeX-to-image converter designed to give you beautiful, shareable math in
+seconds. Quickly paste equations from ChatGPT, Gemini, Claude, academic papers, or other sources and
+turn them into high-resolution images for Word, OneNote, or PowerPoint, Office-ready MathML/HTML
+markup, or simplified text for documentation. The project is optimized for Windows but runs
+anywhere Python does, making it a reliable companion for students, researchers, technical writers,
+and anyone who needs accurate formula rendering without the overhead of a full LaTeX installation.
+
+## Key features at a glance
+
+* **Copy-and-render from AI assistants:** Paste raw LaTeX that you copied from ChatGPT or other LLMs
+  and instantly preview the output before adding it to Word, OneNote, Google Docs, or Notion.
+* **Multiple export formats:** Save as images for slides, copy Office-compatible MathML markup, or
+  grab a plain-text description that reads well in documentation and wikis.
+* **Fast local workflow:** Launch a lightweight Tkinter window instead of juggling online LaTeX
+  compilers or complex PDF pipelines.
+* **Upgradable rendering:** Toggle a full LaTeX toolchain when you need publication-grade output
+  with packages beyond what the built-in renderer covers.
+* **Open-source and scriptable:** Clone or fork the repository to automate math-image generation in
+  your own tools or pipelines.
 
 ![Screenshot 1](Screenshots/1.png)
 ![Screenshot 2](Screenshots/2.png)
