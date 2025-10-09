@@ -140,6 +140,25 @@ def test_plaintext_renders_matrix_structure(latexclip):
     assert result == "[a, b; c, d]"
 
 
+def test_plaintext_handles_matrix_vector_equation(latexclip):
+    latex = r"""A\mathbf{x} =
+\begin{bmatrix}
+1 & 2 \\
+3 & 4
+\end{bmatrix}
+\begin{bmatrix}
+x_1 \\ x_2
+\end{bmatrix}
+=
+\begin{bmatrix}
+5 \\ 11
+\end{bmatrix}"""
+
+    result = latexclip.latex_to_plaintext(latex)
+
+    assert result == "Ax = [1, 2; 3, 4] [x_1; x_2] = [5; 11]"
+
+
 def test_sanitizer_preserves_spaces_inside_text(latexclip):
     latex = r"$$NOI = \text{Operating Expenses}$$"
     result = latexclip.sanitize_for_mathtext(latex)
