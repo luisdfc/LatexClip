@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Optional
 import tkinter as tk
 from tkinter import ttk, messagebox
-from ttkthemes import ThemedTk
+from tkinter import font as tkfont
 
 try:
     from PIL import Image, ImageTk
@@ -500,112 +500,248 @@ def copy_mathml_to_windows_clipboard(mathml: str, plain_text: str) -> None:
 # -----------------------------
 # GUI
 # -----------------------------
-class App(ThemedTk):
+class App(tk.Tk):
     def __init__(self):
-        super().__init__(theme="aquativo")
+        super().__init__()
         self.title("LaTeX Clip")
         self.geometry("960x640")
         self.minsize(880, 560)
-        self.configure(padx=12, pady=12)
 
-        font_ui = ("Segoe UI", 10)
-        font_editor = ("Consolas", 12)
+        available_fonts = set(tkfont.families(self))
+
+        def pick_font(options, fallback):
+            for name in options:
+                if name in available_fonts:
+                    return name
+            return fallback
+
+        ui_family = pick_font(
+            ("SF Pro Text", "SF UI Text", "Helvetica Neue", "Segoe UI", "Arial"),
+            "Helvetica",
+        )
+        display_family = pick_font(
+            ("SF Pro Display", "SF Pro Text", "Helvetica Neue", "Segoe UI", ui_family),
+            ui_family,
+        )
+        mono_family = pick_font(
+            ("SFMono-Regular", "SF Mono", "Menlo", "Consolas", "Courier New"),
+            "Consolas",
+        )
+
+        font_ui = (ui_family, 11)
+        font_editor = (mono_family, 12)
         self.option_add("*Font", font_ui)
 
         self.last_render: Optional[RenderResult] = None
         self.last_photo = None
 
         style = ttk.Style(self)
-        style.configure("Card.TFrame", padding=16)
-        style.configure("Preview.TLabel", background="#f5f7fb", anchor="center")
-        style.configure("Status.TLabel", foreground="#4f5b66")
+        style.theme_use("clam")
+
+        base_bg = "#f5f5f7"
+        surface_bg = "#ffffff"
+        inset_bg = "#f2f2f7"
+        accent = "#0a84ff"
+        text_color = "#1d1d1f"
+        muted = "#6e6e73"
+        outline = "#d2d2d7"
+
+        self.configure(background=base_bg)
+        style.configure("TFrame", background=base_bg)
+        style.configure("TLabel", background=base_bg, foreground=text_color)
+        style.configure(
+            "Surface.TFrame",
+            background=surface_bg,
+            borderwidth=1,
+            relief="solid",
+            bordercolor=outline,
+        )
+        style.configure(
+            "Inset.TFrame",
+            background=inset_bg,
+            borderwidth=1,
+            relief="solid",
+            bordercolor=outline,
+        )
+        style.configure("Card.TFrame", background=surface_bg)
+        style.configure("Surface.TLabel", background=surface_bg, foreground=text_color)
+        style.configure("Title.TLabel", font=(display_family, 22, "bold"), foreground=text_color)
+        style.configure("Subtitle.TLabel", font=(ui_family, 12), foreground=muted)
+        style.configure("Section.TLabel", font=(ui_family, 13, "bold"), background=surface_bg, foreground=text_color)
+        style.configure("Status.TLabel", foreground=muted, background=base_bg, font=(ui_family, 10))
+        style.configure("Caption.TLabel", background=inset_bg, foreground=muted, font=(ui_family, 11))
+        style.configure(
+            "Preview.TLabel",
+            background=surface_bg,
+            anchor="center",
+            foreground=muted,
+            padding=16,
+        )
+        style.configure(
+            "Accent.TButton",
+            background=accent,
+            foreground="#ffffff",
+            font=(ui_family, 11, "bold"),
+            borderwidth=0,
+            padding=(18, 10),
+            relief="flat",
+            focusthickness=3,
+            focuscolor=accent,
+        )
+        style.configure(
+            "Secondary.TButton",
+            background="#e5e5ea",
+            foreground=text_color,
+            font=(ui_family, 11),
+            borderwidth=0,
+            padding=(16, 10),
+            relief="flat",
+            focusthickness=3,
+            focuscolor=outline,
+        )
+        style.map(
+            "Accent.TButton",
+            background=[("active", "#0066d6"), ("pressed", "#0056b8")],
+            foreground=[("disabled", "#ffffff")],
+        )
+        style.map(
+            "Secondary.TButton",
+            background=[("active", "#d7d7dc"), ("pressed", "#c8c8cd")],
+            foreground=[("disabled", "#9c9ca1")],
+        )
+        style.configure(
+            "TCheckbutton",
+            background=surface_bg,
+            foreground=text_color,
+            focuscolor=surface_bg,
+            padding=2,
+        )
+        style.configure(
+            "TSpinbox",
+            arrowsize=14,
+            bordercolor=outline,
+            background=surface_bg,
+            fieldbackground=surface_bg,
+        )
 
         main_frame = ttk.Frame(self)
-        main_frame.pack(fill=tk.BOTH, expand=True)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=32, pady=28)
 
-        # Header
-        header = ttk.Frame(main_frame, padding=(20, 18, 20, 6))
-        header.pack(fill=tk.X)
-        ttk.Label(header, text="LaTeX to Office Clipboard", font=("Segoe UI", 16, "bold")).pack(anchor="w")
+        header = ttk.Frame(main_frame)
+        header.pack(fill=tk.X, pady=(0, 18))
+        ttk.Label(header, text="LaTeX Clip", style="Title.TLabel").pack(anchor="w")
         ttk.Label(
             header,
-            text=(
-                "Render beautiful math, copy high-quality images or paste-ready equations "
-                "into Word, OneNote, and other document apps."
-            ),
+            text="Create presentation-ready equations and copy them anywhere with a single click.",
+            style="Subtitle.TLabel",
             wraplength=720,
-            foreground="#5f6a79",
-        ).pack(anchor="w", pady=(4, 0))
+        ).pack(anchor="w", pady=(6, 0))
 
-        ttk.Separator(main_frame, orient=tk.HORIZONTAL).pack(fill=tk.X, padx=20, pady=(0, 14))
+        content = ttk.Frame(main_frame, style="Surface.TFrame", padding=24)
+        content.pack(fill=tk.BOTH, expand=True)
+        content.columnconfigure(0, weight=1)
+        content.rowconfigure(5, weight=1)
 
-        # Editor card
-        editor_card = ttk.LabelFrame(main_frame, text="Equation Source", padding=12)
-        editor_card.pack(fill=tk.BOTH, expand=False, padx=20, pady=(0, 12))
+        ttk.Label(content, text="Equation Source", style="Section.TLabel").grid(row=0, column=0, sticky="w")
         self.txt = tk.Text(
-            editor_card,
+            content,
             wrap="word",
             height=6,
             font=font_editor,
             relief=tk.FLAT,
-            borderwidth=1,
+            borderwidth=0,
             highlightthickness=1,
-            highlightbackground="#d6d9df",
-            highlightcolor="#4c89ff",
-            padx=12,
-            pady=8,
+            highlightbackground=outline,
+            highlightcolor=accent,
+            padx=14,
+            pady=10,
+            background=inset_bg,
+            foreground=text_color,
+            insertbackground=accent,
         )
-        self.txt.pack(fill=tk.BOTH, expand=True)
+        self.txt.grid(row=1, column=0, sticky="nsew", pady=(12, 18))
 
-        # Options section
-        options_frame = ttk.Frame(main_frame, padding=(20, 0))
-        options_frame.pack(fill=tk.X)
+        options_frame = ttk.Frame(content, style="Card.TFrame")
+        options_frame.grid(row=2, column=0, sticky="w", pady=(0, 12))
         self.fontsize_var = tk.IntVar(value=28)
         self.usetex_var = tk.BooleanVar(value=False)
 
-        ttk.Label(options_frame, text="Font size:").pack(side=tk.LEFT, padx=(0, 8))
-        ttk.Spinbox(options_frame, from_=10, to=96, textvariable=self.fontsize_var, width=5).pack(side=tk.LEFT)
+        ttk.Label(options_frame, text="Font size:", style="Surface.TLabel").pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Spinbox(
+            options_frame,
+            from_=10,
+            to=96,
+            textvariable=self.fontsize_var,
+            width=5,
+        ).pack(side=tk.LEFT)
         ttk.Checkbutton(
             options_frame,
             text="Use full LaTeX (MiKTeX/TeX Live)",
             variable=self.usetex_var,
-        ).pack(side=tk.LEFT, padx=(16, 0))
+        ).pack(side=tk.LEFT, padx=(20, 0))
 
-        # Actions section
-        btns_frame = ttk.Frame(main_frame, padding=(20, 12))
-        btns_frame.pack(fill=tk.X)
-        ttk.Button(btns_frame, text="Preview", command=self.on_preview).pack(side=tk.LEFT, padx=(0, 10))
-        ttk.Button(btns_frame, text="Copy as Image", command=self.on_copy_image).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btns_frame, text="Copy as Plain Text", command=self.on_copy_text).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btns_frame, text="Copy for Word/OneNote", command=self.on_copy_equation).pack(side=tk.LEFT, padx=5)
+        btns_frame = ttk.Frame(content, style="Card.TFrame")
+        btns_frame.grid(row=3, column=0, sticky="w", pady=(0, 16))
+        ttk.Button(btns_frame, text="Preview", style="Accent.TButton", command=self.on_preview).pack(side=tk.LEFT)
+        ttk.Button(
+            btns_frame,
+            text="Copy as Image",
+            style="Secondary.TButton",
+            command=self.on_copy_image,
+        ).pack(side=tk.LEFT, padx=(10, 0))
+        ttk.Button(
+            btns_frame,
+            text="Copy as Plain Text",
+            style="Secondary.TButton",
+            command=self.on_copy_text,
+        ).pack(side=tk.LEFT, padx=(10, 0))
+        ttk.Button(
+            btns_frame,
+            text="Copy for Word/OneNote",
+            style="Secondary.TButton",
+            command=self.on_copy_equation,
+        ).pack(side=tk.LEFT, padx=(10, 0))
 
-        # Status and Preview panels
         self.status = tk.StringVar(value="Ready")
-        ttk.Label(main_frame, textvariable=self.status, style="Status.TLabel", padding=(20, 0)).pack(
-            anchor="w"
+        ttk.Label(content, textvariable=self.status, style="Status.TLabel").grid(
+            row=4, column=0, sticky="w"
         )
 
-        preview_container = ttk.Frame(main_frame, padding=(20, 12))
-        preview_container.pack(fill=tk.BOTH, expand=True)
+        preview_container = ttk.Frame(content, style="Card.TFrame")
+        preview_container.grid(row=5, column=0, sticky="nsew", pady=(20, 0))
+        preview_container.columnconfigure(0, weight=1)
+        preview_container.columnconfigure(1, weight=1)
+        preview_container.rowconfigure(0, weight=1)
 
-        image_panel = ttk.LabelFrame(preview_container, text="Rendered Preview", padding=12)
-        image_panel.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        self.preview = ttk.Label(image_panel, style="Preview.TLabel")
+        image_panel = ttk.Frame(preview_container, style="Card.TFrame")
+        image_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 12))
+        image_panel.configure(padding=16)
+        ttk.Label(image_panel, text="Rendered Preview", style="Section.TLabel").pack(anchor="w")
+        holder = ttk.Frame(image_panel, style="Inset.TFrame", padding=12)
+        holder.pack(fill=tk.BOTH, expand=True, pady=(12, 0))
+        self.preview = ttk.Label(holder, style="Preview.TLabel")
         self.preview.pack(fill=tk.BOTH, expand=True)
+        self.preview.configure(text="Rendered output will appear here")
 
-        text_panel = ttk.LabelFrame(preview_container, text="Plain Text Preview", padding=12)
-        text_panel.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(12, 0))
+        text_panel = ttk.Frame(preview_container, style="Card.TFrame")
+        text_panel.grid(row=0, column=1, sticky="nsew")
+        text_panel.configure(padding=16)
+        ttk.Label(text_panel, text="Plain Text Preview", style="Section.TLabel").pack(anchor="w")
+        text_holder = ttk.Frame(text_panel, style="Inset.TFrame", padding=12)
+        text_holder.pack(fill=tk.BOTH, expand=True, pady=(12, 0))
         self.plain_preview = tk.Text(
-            text_panel,
+            text_holder,
             wrap="word",
             height=6,
             relief=tk.FLAT,
             borderwidth=0,
-            background="#f8f9fb",
-            font=("Segoe UI", 10),
+            background=inset_bg,
+            font=(ui_family, 11),
             state="disabled",
+            foreground=text_color,
         )
         self.plain_preview.pack(fill=tk.BOTH, expand=True)
+        self.update_plain_preview("Plain text preview will appear here")
 
     def get_input(self) -> str:
         return self.txt.get("1.0", "end-1c").strip()
@@ -633,7 +769,7 @@ class App(ThemedTk):
             disp = img.copy()
             disp.thumbnail((max_w, max_h))
         self.last_photo = ImageTk.PhotoImage(disp)
-        self.preview.configure(image=self.last_photo)
+        self.preview.configure(image=self.last_photo, text="")
         self.update_plain_preview(plain)
         return result
 
