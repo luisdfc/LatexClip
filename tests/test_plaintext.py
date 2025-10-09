@@ -171,6 +171,27 @@ def test_sanitizer_escapes_ampersands_inside_text(latexclip):
     assert result == r"$\mathrm{Vacancy\ \&\ Collection}$"
 
 
+def test_sanitizer_flattens_matrix_environments(latexclip):
+    latex = r"""A\mathbf{x} =
+\begin{bmatrix}
+1 & 2 \\
+3 & 4
+\end{bmatrix}
+\begin{bmatrix}
+x_1 \\ x_2
+\end{bmatrix}
+=
+\begin{bmatrix}
+5 \\ 11
+\end{bmatrix}"""
+
+    result = latexclip.sanitize_for_mathtext(latex)
+
+    assert r"\begin" not in result
+    assert "[1, 2; 3, 4]" in result
+    assert result.startswith("$") and result.endswith("$")
+
+
 def test_plaintext_supports_cases_environments(latexclip):
     latex = r"\begin{cases} x^2, & x > 0 \\ 0, & \text{otherwise} \end{cases}"
     result = latexclip.latex_to_plaintext(latex)
@@ -193,3 +214,15 @@ def test_plaintext_flattens_additional_text_macros(latexclip):
     latex = r"\mathbf{Net}~\mathrm{Income}"
     result = latexclip.latex_to_plaintext(latex)
     assert result == "Net Income"
+
+
+def test_sanitizer_formats_cases_with_literal_braces(latexclip):
+    latex = r"\begin{cases} x^2, & x > 0 \\ 0, & x \le 0 \end{cases}"
+    result = latexclip.sanitize_for_mathtext(latex)
+    assert result == r"$\{x^2 if x > 0 \\ 0 if x \le 0\}$"
+
+
+def test_sanitizer_preserves_line_breaks_for_aligned(latexclip):
+    latex = r"\begin{align} a &= b + c \\ d &= e - f \end{align}"
+    result = latexclip.sanitize_for_mathtext(latex)
+    assert result == r"$a = b + c \\ d = e - f$"

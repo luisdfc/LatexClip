@@ -35,6 +35,113 @@ try:
 except Exception:
     latex_to_mathml = None
 
+ESCAPED_AMP_PLACEHOLDER = "__LATEXCLIP_ESC_AMP__"
+
+STRUCTURED_ENVS = {
+    "matrix": "matrix",
+    "pmatrix": "matrix",
+    "bmatrix": "matrix",
+    "Bmatrix": "matrix",
+    "vmatrix": "matrix",
+    "Vmatrix": "matrix",
+    "smallmatrix": "matrix",
+    "array": "matrix",
+    "cases": "cases",
+    "aligned": "aligned",
+    "align": "aligned",
+    "align*": "aligned",
+    "alignat": "aligned",
+    "alignat*": "aligned",
+    "alignedat": "aligned",
+    "gather": "aligned",
+    "gather*": "aligned",
+    "split": "aligned",
+    "multline": "aligned",
+    "multline*": "aligned",
+}
+
+_ENV_PATTERN = "|".join(re.escape(env) for env in STRUCTURED_ENVS)
+_STRUCTURED_ENV_RE = re.compile(
+    r"\\begin\{(?P<env>" + _ENV_PATTERN + r")\}" r"(?P<colspec>\{[^}]*\})?" r"(?P<body>.*?)" r"\\end\{\1\}",
+    flags=re.DOTALL,
+)
+
+MATRIX_DELIMS = {
+    "matrix": ("[", "]"),
+    "pmatrix": ("(", ")"),
+    "bmatrix": ("[", "]"),
+    "Bmatrix": ("{", "}"),
+    "vmatrix": ("|", "|"),
+    "Vmatrix": ("‖", "‖"),
+    "smallmatrix": ("[", "]"),
+    "cases": ("{", "}"),
+    "array": ("[", "]"),
+}
+
+
+def _flatten_structured_envs(
+    text: str, escaped_amp_placeholder: str, *, target: str = "plain"
+) -> str:
+    """Collapse LaTeX matrix/alignment environments into a plain-text form."""
+
+    if target not in {"plain", "mathtext"}:
+        raise ValueError("target must be 'plain' or 'mathtext'")
+
+    def format_matrix(match: re.Match[str]) -> str:
+        env = match.group("env")
+        body = match.group("body") or ""
+        env_kind = STRUCTURED_ENVS.get(env, "matrix")
+        body = body.replace(r"\hline", "")
+        rows = re.split(r"(?<!\\)\\\\", body)
+        formatted_rows: list[str] = []
+        for row in rows:
+            row = row.strip()
+            if not row:
+                continue
+            cols = [c.strip() for c in re.split(r"(?<!\\)&", row)]
+            cols = [c.replace(escaped_amp_placeholder, "&") for c in cols if c]
+            if env_kind == "aligned":
+                formatted_rows.append(" ".join(cols))
+                continue
+            if env_kind == "cases":
+                value = cols[0] if cols else ""
+                if value.endswith((",", ";")):
+                    value = value[:-1].rstrip()
+                condition = " ".join(cols[1:]).lstrip(",; ") if len(cols) > 1 else ""
+                if condition:
+                    if condition.lower().startswith("otherwise"):
+                        formatted_rows.append(f"{value} {condition}")
+                    else:
+                        formatted_rows.append(f"{value} if {condition}")
+                else:
+                    formatted_rows.append(value)
+                continue
+            formatted_rows.append(", ".join(cols))
+        if env_kind == "aligned":
+            joiner = r" \\ " if target == "mathtext" else "; "
+            return joiner.join(formatted_rows)
+        if env_kind == "cases":
+            joiner = r" \\ " if target == "mathtext" else "; "
+            inner = joiner.join(formatted_rows)
+            if target == "mathtext":
+                return r"\{" + inner + r"\}"
+            left, right = ("{", "}")
+            return f"{left}{inner}{right}"
+        left, right = MATRIX_DELIMS.get(env.rstrip("*"), ("[", "]"))
+        inner = "; ".join(formatted_rows)
+        return f"{left}{inner}{right}"
+
+    while True:
+        match = _STRUCTURED_ENV_RE.search(text)
+        if not match:
+            break
+        text = text[: match.start()] + format_matrix(match) + text[match.end():]
+
+    if target == "plain":
+        text = re.sub(r"(?<!\\)\\\\", "; ", text)
+        text = re.sub(r"\s*&\s*", " & ", text)
+    return text
+
 # -----------------------------
 # Helpers
 # -----------------------------
@@ -58,7 +165,7 @@ def latex_to_plaintext(s: str) -> str:
     out = s
     out = out.replace("\r\n", "\n").replace("\r", "\n")
     out = out.replace(r"\{", "__LACE_BRACE__").replace(r"\}", "__RACE_BRACE__")
-    escaped_amp_placeholder = "__LATEXCLIP_ESC_AMP__"
+    escaped_amp_placeholder = ESCAPED_AMP_PLACEHOLDER
     out = out.replace(r"\&", escaped_amp_placeholder)
     out = re.sub(r"\$\$(.*?)\$\$", r"\1", out, flags=re.DOTALL)
     out = re.sub(r"\$(.*?)\$", r"\1", out, flags=re.DOTALL)
@@ -85,96 +192,7 @@ def latex_to_plaintext(s: str) -> str:
     for cmd, replacement in space_cmds.items():
         out = out.replace(cmd, replacement)
 
-    structured_envs = {
-        "matrix": "matrix",
-        "pmatrix": "matrix",
-        "bmatrix": "matrix",
-        "Bmatrix": "matrix",
-        "vmatrix": "matrix",
-        "Vmatrix": "matrix",
-        "smallmatrix": "matrix",
-        "array": "matrix",
-        "cases": "cases",
-        "aligned": "aligned",
-        "align": "aligned",
-        "align*": "aligned",
-        "alignat": "aligned",
-        "alignat*": "aligned",
-        "alignedat": "aligned",
-        "gather": "aligned",
-        "gather*": "aligned",
-        "split": "aligned",
-        "multline": "aligned",
-        "multline*": "aligned",
-    }
-    env_pattern = "|".join(re.escape(env) for env in structured_envs)
-    matrix_pattern = re.compile(
-        r"\\begin\{(?P<env>" + env_pattern + r")\}"
-        r"(?P<colspec>\{[^}]*\})?"
-        r"(?P<body>.*?)"
-        r"\\end\{\1\}",
-        flags=re.DOTALL,
-    )
-    matrix_delims = {
-        "matrix": ("[", "]"),
-        "pmatrix": ("(", ")"),
-        "bmatrix": ("[", "]"),
-        "Bmatrix": ("{", "}"),
-        "vmatrix": ("|", "|"),
-        "Vmatrix": ("‖", "‖"),
-        "smallmatrix": ("[", "]"),
-        "cases": ("{", "}"),
-        "array": ("[", "]"),
-    }
-
-    def format_matrix(match: re.Match[str]) -> str:
-        env = match.group("env")
-        body = match.group("body") or ""
-        env_kind = structured_envs.get(env, "matrix")
-        body = body.replace(r"\hline", "")
-        rows = re.split(r"(?<!\\)\\\\", body)
-        formatted_rows = []
-        for row in rows:
-            row = row.strip()
-            if not row:
-                continue
-            cols = [c.strip() for c in re.split(r"(?<!\\)&", row)]
-            cols = [c.replace(escaped_amp_placeholder, "&") for c in cols if c]
-            if env_kind == "aligned":
-                formatted_rows.append(" ".join(cols))
-                continue
-            if env_kind == "cases":
-                value = cols[0] if cols else ""
-                if value.endswith((",", ";")):
-                    value = value[:-1].rstrip()
-                condition = " ".join(cols[1:]).lstrip(",; ") if len(cols) > 1 else ""
-                if condition:
-                    if condition.lower().startswith("otherwise"):
-                        formatted_rows.append(f"{value} {condition}")
-                    else:
-                        formatted_rows.append(f"{value} if {condition}")
-                else:
-                    formatted_rows.append(value)
-                continue
-            formatted_rows.append(", ".join(cols))
-        if env_kind == "aligned":
-            return "; ".join(formatted_rows)
-        if env_kind == "cases":
-            inner = "; ".join(formatted_rows)
-            left, right = ("{", "}")
-            return f"{left}{inner}{right}"
-        left, right = matrix_delims.get(env.rstrip("*"), ("[", "]"))
-        inner = "; ".join(formatted_rows)
-        return f"{left}{inner}{right}"
-
-    while True:
-        match = matrix_pattern.search(out)
-        if not match:
-            break
-        out = out[: match.start()] + format_matrix(match) + out[match.end():]
-
-    out = re.sub(r"(?<!\\)\\\\", "; ", out)
-    out = re.sub(r"\s*&\s*", " & ", out)
+    out = _flatten_structured_envs(out, escaped_amp_placeholder)
 
     out = re.sub(r"\\(sin|cos|tan|log|ln|det|dim|lim|exp|deg|sec|csc|cot)\b", r"\1", out)
 
@@ -311,6 +329,10 @@ def sanitize_for_mathtext(s: str) -> str:
     if text.startswith(r"\[") and text.endswith(r"\]"):
         text = text[2:-2].strip()
     already_math = text.startswith("$") and text.endswith("$")
+
+    text = text.replace(r"\&", ESCAPED_AMP_PLACEHOLDER)
+    text = _flatten_structured_envs(text, ESCAPED_AMP_PLACEHOLDER, target="mathtext")
+    text = text.replace(ESCAPED_AMP_PLACEHOLDER, "&")
 
     def escape_literals(segment: str) -> str:
         return re.sub(r"(?<!\\)([%&#$])", r"\\\1", segment)
