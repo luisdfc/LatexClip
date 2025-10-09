@@ -93,3 +93,25 @@ Si prefieres abrir la herramienta sin usar la terminal, puedes generar un ejecut
 ---
 
 ¿Listo para compartir tus notas? Copia tus fórmulas desde ChatGPT, pega en LaTeX Clip y obtén imágenes nítidas o marcado listo para tus documentos profesionales.
+
+---
+
+## Licencia
+
+Copyright (c) 2024 colaboradores de LaTeX Clip
+
+Por la presente se concede permiso, libre de cargos, a cualquier persona que obtenga una copia
+de este software y de los archivos de documentación asociados (el "Software"), para operar con
+el Software sin restricción, incluyendo sin limitación los derechos a usar, copiar, modificar,
+fusionar, publicar y distribuir copias del Software, y a permitir que las personas a las que se
+les proporcione el Software lo hagan, sujeto a las siguientes condiciones:
+
+El aviso de copyright anterior y este aviso de permiso deberán incluirse en todas las copias o
+partes sustanciales del Software.
+
+EL SOFTWARE SE PROPORCIONA "TAL CUAL", SIN GARANTÍA DE NINGÚN TIPO, EXPRESA O IMPLÍCITA,
+INCLUYENDO PERO NO LIMITADO A LAS GARANTÍAS DE COMERCIALIZACIÓN, IDONEIDAD PARA UN PROPÓSITO
+PARTICULAR E INCUMPLIMIENTO. EN NINGÚN CASO LOS AUTORES O LOS TITULARES DEL COPYRIGHT SERÁN
+RESPONSABLES DE NINGUNA RECLAMACIÓN, DAÑO O OTRA RESPONSABILIDAD, YA SEA EN UNA ACCIÓN DE
+CONTRATO, AGRAVIO O CUALQUIER OTRA FIGURA, QUE SURJA DE, O EN CONEXIÓN CON EL SOFTWARE O SU
+USO U OTROS TRATOS EN EL SOFTWARE.
