@@ -1,0 +1,4 @@
+Pillow
+matplotlib
+latex2mathml
+pywin32; platform_system == 'Windows'
