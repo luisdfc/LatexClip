@@ -32,7 +32,7 @@ If you don't have Python, you need to install it first.
     ```
 3.  Install the necessary Python libraries by running this command:
     ```cmd
-    pip install pillow matplotlib ttkthemes pywin32 latex2mathml
+    pip install pillow matplotlib pywin32 latex2mathml
     ```
     *On non-Windows systems the `pywin32` dependency is optional and can be
     omitted. The `latex2mathml` library enables the new "Copy for Word/OneNote"
