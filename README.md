@@ -30,13 +30,15 @@ If you don't have Python, you need to install it first.
     ```cmd
     cd C:\Users\YourUser\Documents\LatexTool
     ```
-3.  Install the necessary Python libraries by running this command:
+3.  Install the necessary Python libraries listed in `requirements.txt`:
     ```cmd
-    pip install pillow matplotlib pywin32 latex2mathml
+    pip install -r requirements.txt
     ```
-    *On non-Windows systems the `pywin32` dependency is optional and can be
-    omitted. The `latex2mathml` library enables the new "Copy for Word/OneNote"
-    button. If you do not need MathML clipboard support you may skip it.*
+    *On non-Windows systems the `pywin32` dependency from the requirements file
+    is optional and will be skipped automatically. The `latex2mathml` library
+    enables the "Copy for Word/OneNote" button; if you do not need MathML
+    clipboard support you may uninstall it later with `pip uninstall
+    latex2mathml`.*
 
 ### Step 4: Run the Application
 
