@@ -1,4 +1,4 @@
-Pillow
-matplotlib
-latex2mathml
-pywin32; platform_system == 'Windows'
+Pillow>=10.0
+matplotlib>=3.8
+latex2mathml>=3.77
+pywin32>=306; platform_system == 'Windows'
