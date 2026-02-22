@@ -58,6 +58,8 @@ STRUCTURED_ENVS = {
     "split": "aligned",
     "multline": "aligned",
     "multline*": "aligned",
+    "eqnarray": "aligned",
+    "eqnarray*": "aligned",
 }
 
 _ENV_PATTERN = "|".join(re.escape(env) for env in STRUCTURED_ENVS)
@@ -161,24 +163,73 @@ TEXT_MACROS = (
 )
 
 
+def strip_math_delimiters(value: str) -> str:
+    text = value.strip()
+    if text.startswith("$$") and text.endswith("$$"):
+        text = text[2:-2].strip()
+    if text.startswith(r"\[") and text.endswith(r"\]"):
+        text = text[2:-2].strip()
+    if text.startswith("$") and text.endswith("$"):
+        text = text[1:-1].strip()
+    return text
+
+
+def extract_braced_group(text: str, start: int) -> tuple[Optional[str], int]:
+    if start >= len(text) or text[start] != "{":
+        return None, start
+    depth = 0
+    i = start
+    buf: list[str] = []
+    while i < len(text):
+        ch = text[i]
+        if ch == "{" and (i == start or text[i - 1] != "\\"):
+            depth += 1
+            if depth > 1:
+                buf.append(ch)
+        elif ch == "}" and text[i - 1] != "\\":
+            depth -= 1
+            if depth == 0:
+                return "".join(buf), i + 1
+            buf.append(ch)
+        else:
+            buf.append(ch)
+        i += 1
+    return None, start
+
+
+def replace_text_macros(text: str, escaped_amp_placeholder: str) -> str:
+    commands = tuple(f"\\{name}" for name in TEXT_MACROS)
+    i = 0
+    out: list[str] = []
+    while i < len(text):
+        cmd = next((c for c in commands if text.startswith(c, i)), None)
+        if not cmd:
+            out.append(text[i])
+            i += 1
+            continue
+        pos = i + len(cmd)
+        if pos < len(text) and text[pos] == "*":
+            pos += 1
+        content, end_pos = extract_braced_group(text, pos)
+        if content is None:
+            out.append(text[i])
+            i += 1
+            continue
+        content = content.replace(r"\ ", " ")
+        content = re.sub(r"\s+", " ", content).strip()
+        content = content.replace(escaped_amp_placeholder, "&")
+        out.append(content)
+        i = end_pos
+    return "".join(out)
+
+
 def latex_to_plaintext(s: str) -> str:
-    out = s
+    out = strip_math_delimiters(s)
     out = out.replace("\r\n", "\n").replace("\r", "\n")
     out = out.replace(r"\{", "__LACE_BRACE__").replace(r"\}", "__RACE_BRACE__")
     escaped_amp_placeholder = ESCAPED_AMP_PLACEHOLDER
     out = out.replace(r"\&", escaped_amp_placeholder)
-    out = re.sub(r"\$\$(.*?)\$\$", r"\1", out, flags=re.DOTALL)
-    out = re.sub(r"\$(.*?)\$", r"\1", out, flags=re.DOTALL)
-
-    def unwrap_text(match: re.Match[str]) -> str:
-        inner = match.group(1)
-        inner = inner.replace(r"\ ", " ")
-        inner = re.sub(r"\s+", " ", inner).strip()
-        inner = inner.replace(escaped_amp_placeholder, "&")
-        return inner
-
-    text_macro_pattern = r"\\(?:" + "|".join(TEXT_MACROS) + r")\*?\{([^}]*)\}"
-    out = re.sub(text_macro_pattern, unwrap_text, out)
+    out = replace_text_macros(out, escaped_amp_placeholder)
 
     space_cmds = {
         r"\,": " ",
@@ -222,28 +273,6 @@ def latex_to_plaintext(s: str) -> str:
     out = re.sub(r"\\sqrt\[([^\]]*)\]\{([^}]*)\}", r"(\2)^(1/\1)", out)
     out = re.sub(r"\\sqrt\{([^}]*)\}", r"sqrt(\1)", out)
 
-    def extract_braced(text: str, start: int) -> tuple[Optional[str], int]:
-        if start >= len(text) or text[start] != "{":
-            return None, start
-        depth = 0
-        i = start
-        buf: list[str] = []
-        while i < len(text):
-            ch = text[i]
-            if ch == "{":
-                depth += 1
-                if depth > 1:
-                    buf.append(ch)
-            elif ch == "}":
-                depth -= 1
-                if depth == 0:
-                    return "".join(buf), i + 1
-                buf.append(ch)
-            else:
-                buf.append(ch)
-            i += 1
-        return None, start
-
     def skip_ws(text: str, idx: int) -> int:
         while idx < len(text) and text[idx].isspace():
             idx += 1
@@ -260,13 +289,13 @@ def latex_to_plaintext(s: str) -> str:
                 i += 1
                 continue
             pos = skip_ws(text, i + len(cmd))
-            num, pos = extract_braced(text, pos)
+            num, pos = extract_braced_group(text, pos)
             if num is None:
                 pieces.append(text[i])
                 i += 1
                 continue
             pos = skip_ws(text, pos)
-            den, pos = extract_braced(text, pos)
+            den, pos = extract_braced_group(text, pos)
             if den is None:
                 pieces.append(text[i])
                 i += 1
@@ -290,13 +319,13 @@ def latex_to_plaintext(s: str) -> str:
                 i += 1
                 continue
             pos = skip_ws(text, i + len(cmd))
-            upper, pos = extract_braced(text, pos)
+            upper, pos = extract_braced_group(text, pos)
             if upper is None:
                 pieces.append(text[i])
                 i += 1
                 continue
             pos = skip_ws(text, pos)
-            lower, pos = extract_braced(text, pos)
+            lower, pos = extract_braced_group(text, pos)
             if lower is None:
                 pieces.append(text[i])
                 i += 1
@@ -323,12 +352,8 @@ def latex_to_plaintext(s: str) -> str:
     return out
 
 def sanitize_for_mathtext(s: str) -> str:
-    text = s.strip()
-    if text.startswith("$$") and text.endswith("$$"):
-        text = text[2:-2].strip()
-    if text.startswith(r"\[") and text.endswith(r"\]"):
-        text = text[2:-2].strip()
-    already_math = text.startswith("$") and text.endswith("$")
+    stripped = s.strip()
+    text = strip_math_delimiters(stripped)
 
     text = text.replace(r"\&", ESCAPED_AMP_PLACEHOLDER)
     text = _flatten_structured_envs(text, ESCAPED_AMP_PLACEHOLDER, target="mathtext")
@@ -350,7 +375,7 @@ def sanitize_for_mathtext(s: str) -> str:
     text = escape_literals(text)
     text = text.replace(r"\left", "").replace(r"\right", "")
     text = re.sub(r"\s+", " ", text).strip()
-    if not already_math and "\n" not in text:
+    if "\n" not in text:
         text = f"${text}$"
     return text
 
@@ -365,7 +390,7 @@ def clamp_image(img, max_megapixels=10, max_side=6000):
     new_size = (max(1, int(w*scale)), max(1, int(h*scale)))
     return img.resize(new_size, Image.LANCZOS)
 
-def render_latex_to_png_bytes(latex: str, fontsize: int = 28, usetex: bool = False) -> bytes:
+def render_latex_to_png_bytes(latex: str, fontsize: int = 28, usetex: bool = False, dpi: int = 300) -> bytes:
     rcParams["text.usetex"] = bool(usetex)
     rcParams["mathtext.default"] = "regular"
     content = latex.strip()
@@ -378,7 +403,7 @@ def render_latex_to_png_bytes(latex: str, fontsize: int = 28, usetex: bool = Fal
             content = r"\[" + content + r"\]"
 
     # Use a sensible figure size and tight bbox instead of manual bbox math
-    fig = plt.figure(figsize=(6, 2), dpi=300)
+    fig = plt.figure(figsize=(8, 2.8), dpi=dpi)
     fig.patch.set_alpha(0.0)
     ax = fig.add_axes([0, 0, 1, 1])
     ax.axis("off")
@@ -387,7 +412,7 @@ def render_latex_to_png_bytes(latex: str, fontsize: int = 28, usetex: bool = Fal
         # Left-align to reduce chance of off-canvas metrics
         ax.text(0.01, 0.5, content, ha="left", va="center", fontsize=fontsize)
         buf = io.BytesIO()
-        plt.savefig(buf, format="png", dpi=300, transparent=True, bbox_inches='tight', pad_inches=0.02)
+        plt.savefig(buf, format="png", dpi=dpi, transparent=True, bbox_inches='tight', pad_inches=0.03)
         buf.seek(0)
         # Trim transparent padding then clamp to safe size
         img = Image.open(buf).convert("RGBA")
@@ -454,6 +479,65 @@ def copy_image_to_windows_clipboard(img):
         win32clipboard.CloseClipboard()
 
 
+
+def latex_to_mathml_fragment(latex: str) -> str:
+    if latex_to_mathml is None:
+        raise RuntimeError(
+            "Copying equations requires the optional 'latex2mathml' package.\n"
+            "Install it with: pip install latex2mathml"
+        )
+    source = strip_math_delimiters(latex)
+    if not source:
+        raise ValueError("Enter some LaTeX first.")
+    return latex_to_mathml(source)
+
+
+def build_office_math_html(mathml: str, plain_text: str) -> bytes:
+    fragment = mathml.strip()
+    if not fragment:
+        raise ValueError("Empty MathML fragment")
+    if "<math" not in fragment:
+        fragment = f"<math xmlns='http://www.w3.org/1998/Math/MathML'>{fragment}</math>"
+
+    escaped_plain = (
+        plain_text.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+    )
+    html = (
+        "<html><body>\r\n"
+        "<!--StartFragment-->"
+        "<div>"
+        "<span style='font-family:Cambria Math,Segoe UI Symbol,serif'>"
+        f"{fragment}"
+        "</span>"
+        "</div>"
+        f"<div>{escaped_plain}</div>"
+        "<!--EndFragment-->\r\n"
+        "</body></html>"
+    )
+
+    header_template = (
+        "Version:0.9\r\n"
+        "StartHTML:{start_html:08d}\r\n"
+        "EndHTML:{end_html:08d}\r\n"
+        "StartFragment:{start_fragment:08d}\r\n"
+        "EndFragment:{end_fragment:08d}\r\n"
+    )
+    preliminary_header = header_template.format(start_html=0, end_html=0, start_fragment=0, end_fragment=0)
+    start_html = len(preliminary_header)
+    start_fragment = start_html + html.index("<!--StartFragment-->") + len("<!--StartFragment-->")
+    end_fragment = start_html + html.index("<!--EndFragment-->")
+    end_html = start_html + len(html)
+
+    header = header_template.format(
+        start_html=start_html,
+        end_html=end_html,
+        start_fragment=start_fragment,
+        end_fragment=end_fragment,
+    )
+    return (header + html).encode("utf-8")
+
 def build_html_clipboard_fragment(mathml: str) -> bytes:
     fragment = mathml.strip()
     if not fragment:
@@ -500,7 +584,7 @@ def copy_mathml_to_windows_clipboard(mathml: str, plain_text: str) -> None:
     if not HAVE_PYWIN32:
         raise RuntimeError("pywin32 not installed. Install with: pip install pywin32")
 
-    payload = build_html_clipboard_fragment(mathml)
+    payload = build_office_math_html(mathml, plain_text)
 
     win32clipboard.OpenClipboard()
     try:
@@ -558,6 +642,7 @@ class App(tk.Tk):
 
         self.last_render: Optional[RenderResult] = None
         self.last_photo = None
+        self.last_mathml: Optional[str] = None
 
         style = ttk.Style(self)
         style.theme_use("clam")
@@ -689,6 +774,7 @@ class App(tk.Tk):
         options_frame.grid(row=2, column=0, sticky="w", pady=(0, 12))
         self.fontsize_var = tk.IntVar(value=28)
         self.usetex_var = tk.BooleanVar(value=False)
+        self.dpi_var = tk.IntVar(value=300)
 
         ttk.Label(options_frame, text="Font size:", style="Surface.TLabel").pack(side=tk.LEFT, padx=(0, 8))
         ttk.Spinbox(
@@ -698,6 +784,8 @@ class App(tk.Tk):
             textvariable=self.fontsize_var,
             width=5,
         ).pack(side=tk.LEFT)
+        ttk.Label(options_frame, text="DPI:", style="Surface.TLabel").pack(side=tk.LEFT, padx=(18, 8))
+        ttk.Spinbox(options_frame, from_=120, to=600, increment=30, textvariable=self.dpi_var, width=5).pack(side=tk.LEFT)
         ttk.Checkbutton(
             options_frame,
             text="Use full LaTeX (MiKTeX/TeX Live)",
@@ -726,7 +814,7 @@ class App(tk.Tk):
             command=self.on_copy_equation,
         ).pack(side=tk.LEFT, padx=(10, 0))
 
-        self.status = tk.StringVar(value="Ready")
+        self.status = tk.StringVar(value="Ready • Tip: Ctrl+Enter previews, Ctrl+Shift+C copies equation")
         ttk.Label(content, textvariable=self.status, style="Status.TLabel").grid(
             row=4, column=0, sticky="w"
         )
@@ -767,6 +855,9 @@ class App(tk.Tk):
         self.plain_preview.pack(fill=tk.BOTH, expand=True)
         self.update_plain_preview("Plain text preview will appear here")
 
+        self.bind("<Control-Return>", lambda _e: self.on_preview())
+        self.bind("<Control-Shift-C>", lambda _e: self.on_copy_equation())
+
     def get_input(self) -> str:
         return self.txt.get("1.0", "end-1c").strip()
 
@@ -781,10 +872,12 @@ class App(tk.Tk):
             latex,
             fontsize=self.fontsize_var.get(),
             usetex=self.usetex_var.get(),
+            dpi=self.dpi_var.get(),
         )
         img = png_bytes_to_pil(png)
         plain = latex_to_plaintext(latex)
         result = RenderResult(image=img, latex=latex, plain_text=plain)
+        self.last_mathml = None
         self.last_render = result
 
         max_w, max_h = 820, 320
@@ -842,12 +935,8 @@ class App(tk.Tk):
             if not latex:
                 raise ValueError("Enter some LaTeX first.")
             plain = latex_to_plaintext(latex)
-            if latex_to_mathml is None:
-                raise RuntimeError(
-                    "Copying equations requires the optional 'latex2mathml' package.\n"
-                    "Install it with: pip install latex2mathml"
-                )
-            mathml = latex_to_mathml(latex)
+            mathml = latex_to_mathml_fragment(latex)
+            self.last_mathml = mathml
             if HAVE_PYWIN32:
                 copy_mathml_to_windows_clipboard(mathml, plain)
                 self.set_status("Equation markup copied ✔  (Paste directly into Word/OneNote)")
@@ -867,6 +956,5 @@ class App(tk.Tk):
 if __name__ == "__main__":
     app = App()
     app.mainloop()
-
 
 

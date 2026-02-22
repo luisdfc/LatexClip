@@ -68,6 +68,8 @@ python latexclip.py
 
 The application window will open, and you can start converting your LaTeX. Use the **Copy for Word/OneNote** button to place MathML/HTML markup on the clipboard that pastes directly into Office equation editors. A live plain-text preview shows you what the simplified version will look like for documentation.
 
+Shortcuts: **Ctrl+Enter** refreshes preview and **Ctrl+Shift+C** copies the Office-friendly equation payload. You can also tune **DPI** in the options row for sharper formulas in slides/documents.
+
 ---
 
 ## Tips for Complex Formulas

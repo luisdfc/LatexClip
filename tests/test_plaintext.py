@@ -226,3 +226,12 @@ def test_sanitizer_preserves_line_breaks_for_aligned(latexclip):
     latex = r"\begin{align} a &= b + c \\ d &= e - f \end{align}"
     result = latexclip.sanitize_for_mathtext(latex)
     assert result == r"$a = b + c \\ d = e - f$"
+
+def test_plaintext_handles_nested_text_macro_braces(latexclip):
+    result = latexclip.latex_to_plaintext(r"\text{cost\{x\}} + y")
+    assert result == "cost{x} + y"
+
+
+def test_plaintext_removes_bracket_delimiters(latexclip):
+    result = latexclip.latex_to_plaintext(r"\[\frac{a}{b}\]")
+    assert result == "(a)/(b)"
